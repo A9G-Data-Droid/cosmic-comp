@@ -175,7 +175,8 @@ impl ClientState {
 
 impl ClientData for ClientState {
     fn initialized(&self, _client_id: ClientId) {}
-    fn disconnected(&self, client_id: ClientId, _reason: DisconnectReason) {
+    fn disconnected(&self, client_id: ClientId, reason: DisconnectReason) {
+        warn!(?client_id, ?reason, "Wayland client disconnected");
         self.evlh.insert_idle(move |state| {
             if let BackendData::Kms(kms_state) = &mut state.backend {
                 for device in kms_state.drm_devices.values_mut() {

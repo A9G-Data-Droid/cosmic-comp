@@ -67,8 +67,10 @@ fn xdg_popup_ensure_initial_configure(popup: &PopupKind) {
         });
         if !initial_configure_sent {
             // NOTE: This should never fail as the initial configure is always
-            // allowed.
-            popup.send_configure().expect("initial configure failed");
+            // allowed, but log a warning rather than panicking if it does.
+            if let Err(err) = popup.send_configure() {
+                tracing::warn!(?err, "Initial popup configure failed");
+            }
         }
     }
 }

@@ -299,6 +299,13 @@ fn init_wayland_display(
     let display = Display::new().unwrap();
     let handle = display.handle();
 
+    // Default buffer size in wayland-backend is only 4096 bytes. Under high event rates
+    // (e.g. 144Hz / VRR vblank callbacks, pointer motion bursts, or popup events),
+    // brief client processing stalls cause outgoing buffer overflow and silent
+    // ECONNRESET terminations (issue #2894). Increase default buffer size to 2 MiB.
+    const WAYLAND_DEFAULT_MAX_BUFFER_SIZE: usize = 2 * 1024 * 1024;
+    handle.set_default_max_buffer_size(WAYLAND_DEFAULT_MAX_BUFFER_SIZE);
+
     let source = ListeningSocketSource::new_auto().unwrap();
     let socket_name = source.socket_name().to_os_string();
     info!("Listening on {:?}", socket_name);
@@ -307,12 +314,20 @@ fn init_wayland_display(
         .handle()
         .insert_source(source, |client_stream, _, state| {
             let client_state = state.new_client_state();
-            if let Err(err) = state
+            match state
                 .common
                 .display_handle
                 .insert_client(client_stream, Arc::new(client_state))
             {
-                warn!(?err, "Error adding wayland client")
+                Ok(client) => {
+                    client.set_max_buffer_size(
+                        &state.common.display_handle,
+                        WAYLAND_DEFAULT_MAX_BUFFER_SIZE,
+                    );
+                }
+                Err(err) => {
+                    warn!(?err, "Error adding wayland client")
+                }
             };
         })
         .with_context(|| "Failed to init the wayland socket source.")?;

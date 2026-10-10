@@ -79,17 +79,17 @@ impl XdgShellHandler for State {
 
             if let Err(err) = surface.send_configure() {
                 warn!("Unable to configure popup. {err:?}",);
-            } else {
-                self.common
-                    .popups
-                    .track_popup(PopupKind::from(surface))
-                    .unwrap();
+            } else if let Err(err) = self.common.popups.track_popup(PopupKind::from(surface)) {
+                warn!("Failed to track popup: {err:?}");
             }
         }
     }
 
     fn grab(&mut self, surface: PopupSurface, seat: WlSeat, serial: Serial) {
-        let seat = Seat::from_resource(&seat).unwrap();
+        let Some(seat) = Seat::from_resource(&seat) else {
+            tracing::warn!("No seat found for popup grab.");
+            return;
+        };
         let kind = PopupKind::Xdg(surface);
         let maybe_root = find_popup_root_surface(&kind).ok();
         if maybe_root.is_none() {
